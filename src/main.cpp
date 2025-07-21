@@ -106,7 +106,7 @@ void setup() {
   config.xclk_freq_hz = 20000000;
   // config.pixel_format = PIXFORMAT_JPEG;
   // config.frame_size   = FRAMESIZE_QVGA;
-  config.pixel_format = PIXFORMAT_RGB565;
+  config.pixel_format = PIXFORMAT_GRAYSCALE;
   config.frame_size = FRAMESIZE_96X96;
   config.jpeg_quality = 12;                // 0-63 (низьке число = висока якість)
   config.fb_count = 1;
@@ -142,7 +142,7 @@ void setup() {
 }
 
 void loop() {
-  Serial.println("camera ok");
+  Serial.println("Capturing...");
 
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
@@ -150,47 +150,37 @@ void loop() {
     return;
   }
 
-  if (fb->width != 96 || fb->height != 96) {
-    Serial.printf("Expected 96x96 image, got %dx%d\n", fb->width, fb->height);
+  if (fb->width != 96 || fb->height != 96 || fb->len != 96 * 96 * 1) {
+    Serial.printf("Unexpected image size: %dx%d, %d bytes\n", fb->width, fb->height, fb->len);
     esp_camera_fb_return(fb);
     return;
   }
 
-  // 3. Створюємо буфер RGB888 з RGB565
-  for (size_t i = 0; i < EI_CLASSIFIER_INPUT_WIDTH * EI_CLASSIFIER_INPUT_HEIGHT; i++) {
-    uint16_t pixel = ((uint16_t *)fb->buf)[i];
-
-    rgb888_resized[i * 3 + 0] = ((pixel >> 11) & 0x1F) << 3; // R
-    rgb888_resized[i * 3 + 1] = ((pixel >> 5) & 0x3F) << 2;  // G
-    rgb888_resized[i * 3 + 2] = (pixel & 0x1F) << 3;         // B
+  // Копіюємо зображення напряму в features (нормалізуємо)
+  for (size_t i = 0; i < fb->len; i++) {
+    features[i] = static_cast<float>(fb->buf[i]) / 255.0f;
   }
 
-  esp_camera_fb_return(fb); // Звільняємо кадр
+  esp_camera_fb_return(fb);
 
-  // 4. Подаємо RGB888 як features[] без нормалізації
-  for (size_t i = 0; i < EI_CLASSIFIER_INPUT_WIDTH * EI_CLASSIFIER_INPUT_HEIGHT * 3; i++) {
-    //features[i] = static_cast<float>(rgb888_resized[i]);
-    features[i] = static_cast<float>(rgb888_resized[i]) / 255.0f;
-  }
-
-  signal_t signal;
+  // Готуємо signal
+  ei::signal_t signal;
   signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
-  signal.get_data = [](size_t offset, size_t length, float *out_ptr) -> int {
-    memcpy(out_ptr, features + offset, length * sizeof(float));
-    return 0;
-  };
+  signal.get_data = get_signal_data;
 
-  ei_impulse_result_t result;
+  // Запуск класифікатора
   EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
   if (res != EI_IMPULSE_OK) {
     Serial.printf("Classifier error: %d\n", res);
     return;
   }
 
+  // Вивід результатів
   for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
     ei_printf("%s: %.2f%%\n", result.classification[ix].label, result.classification[ix].value * 100.f);
   }
 
   delay(5000);
 }
+
 
