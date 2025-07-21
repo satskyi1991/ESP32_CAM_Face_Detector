@@ -131,7 +131,7 @@ const ei_impulse_t impulse_747411_0 = {
     .project_name = "Image recognition",
     .impulse_id = 1,
     .impulse_name = "Impulse #1",
-    .deploy_version = 6,
+    .deploy_version = 8,
 
     .nn_input_frame_size = 27648,
     .raw_sample_count = 9216,

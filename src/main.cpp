@@ -169,8 +169,8 @@ void loop() {
 
   // 4. Подаємо RGB888 як features[] без нормалізації
   for (size_t i = 0; i < EI_CLASSIFIER_INPUT_WIDTH * EI_CLASSIFIER_INPUT_HEIGHT * 3; i++) {
-    features[i] = static_cast<float>(rgb888_resized[i]);
-    //features[i] = static_cast<float>(rgb888_resized[i]) / 255.0f;
+    //features[i] = static_cast<float>(rgb888_resized[i]);
+    features[i] = static_cast<float>(rgb888_resized[i]) / 255.0f;
   }
 
   signal_t signal;
